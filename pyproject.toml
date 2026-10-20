@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "arch-security-audit"
+version = "0.1.0"
+description = "Small, evidence-based, read-only security checks for Arch Linux"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+keywords = ["archlinux", "security", "audit", "linux"]
+classifiers = ["Operating System :: POSIX :: Linux", "Programming Language :: Python :: 3"]
+
+[project.scripts]
+arch-security-audit = "arch_security_audit.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["arch_security_audit*"]

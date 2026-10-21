@@ -7,6 +7,7 @@ import sys
 
 from . import __version__
 from .checks import CHECKS, Finding
+from .compare import compare_reports, load_report
 
 
 def terminal_safe(value):
@@ -44,7 +45,34 @@ def main(argv=None):
     parser.add_argument("--online", action="store_true", help="Allow checkupdates network access and temporary database writes (non-root)")
     parser.add_argument("--strict", action="store_true", help="Exit 2 on UNKNOWN, otherwise 1 on WARN, otherwise 0")
     parser.add_argument("--demo", action="store_true", help="Show fictional findings without inspecting the system")
+    parser.add_argument("--compare", nargs=2, metavar=("BEFORE", "AFTER"), help="Compare two saved JSON reports offline")
     args = parser.parse_args(argv)
+    if args.compare:
+        if args.only or args.online or args.demo or args.strict:
+            parser.error("--compare supports --format only; audit options do not apply")
+        try:
+            result = compare_reports(*(load_report(name) for name in args.compare))
+        except (OSError, ValueError) as exc:
+            print(f"Cannot compare reports: {terminal_safe(exc)}", file=sys.stderr)
+            return 2
+        if args.format == "json":
+            print(json.dumps(result, indent=2, ensure_ascii=True))
+        else:
+            print("arch-security-audit report comparison")
+            print(result["note"])
+            for change in result["changes"]:
+                before, after = change["before"], change["after"]
+                print(f"\n[{change['change']}] {terminal_safe(change['check'])}: "
+                      f"{before['status'] if before else 'not checked'} -> {after['status'] if after else 'not checked'}")
+                if change["change"] != "unchanged":
+                    for label, finding in (("Before", before), ("After", after)):
+                        if finding:
+                            print(f"  {label}: {terminal_safe(finding['title'])}")
+                            for evidence in finding["evidence"]:
+                                print(f"    - {terminal_safe(evidence)}")
+                            print(f"    Why: {terminal_safe(finding['explanation'])}")
+                            print(f"    Next: {terminal_safe(finding['suggestion'])}")
+        return 0
     if sys.platform != "linux" and not args.demo:
         parser.error("Live checks require Linux. Use --demo on other operating systems.")
     selected = list(dict.fromkeys(args.only or CHECKS))

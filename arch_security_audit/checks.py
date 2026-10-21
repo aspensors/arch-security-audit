@@ -105,6 +105,11 @@ def ssh(runner=run):
     if any(key not in settings for key in keys):
         return unavailable("ssh", Command(None, error="sshd output is missing expected authentication settings"),
                            "Inspect sshd -T manually.")
+    allowed = {"permitrootlogin": {"yes", "no", "prohibit-password", "without-password", "forced-commands-only"},
+               **{key: {"yes", "no"} for key in keys[1:]}}
+    if any(settings[key] not in allowed[key] for key in keys):
+        return unavailable("ssh", Command(None, error="sshd output contains unsupported authentication values"),
+                           "Validate the configuration and inspect sshd -T manually.")
     risky = (settings["permitrootlogin"] == "yes" or settings["passwordauthentication"] == "yes"
              or settings["kbdinteractiveauthentication"] == "yes")
     return Finding(
@@ -149,19 +154,30 @@ def privileges(root=Path("/")):
     evidence, risks, errors = [], [], []
     try:
         for line in (root / "etc/passwd").read_text().splitlines():
+            if not line.strip() or line.lstrip().startswith("#"):
+                continue
             parts = line.split(":")
-            if len(parts) != 7 or not parts[2].isdigit():
+            if (len(parts) != 7 or not parts[0] or
+                    not all(value.isascii() and value.isdecimal() for value in parts[2:4])):
                 errors.append("Malformed /etc/passwd entry")
                 continue
             if int(parts[2]) == 0:
                 evidence.append(f"Local UID 0 account: {parts[0]}")
                 if parts[0] != "root":
                     risks.append(f"Additional UID 0 account: {parts[0]}")
+    except (OSError, UnicodeError) as exc:
+        errors.append(str(exc))
+    try:
         for line in (root / "etc/group").read_text().splitlines():
+            if not line.strip() or line.lstrip().startswith("#"):
+                continue
             parts = line.split(":")
-            if len(parts) == 4 and parts[0] in {"wheel", "sudo"}:
+            if len(parts) != 4 or not parts[0] or not parts[2].isascii() or not parts[2].isdecimal():
+                errors.append("Malformed /etc/group entry")
+                continue
+            if parts[0] in {"wheel", "sudo"}:
                 evidence.append(f"{parts[0]} supplementary members: {parts[3] or '(none)'}")
-    except OSError as exc:
+    except (OSError, UnicodeError) as exc:
         errors.append(str(exc))
     sudoers = root / "etc/sudoers"
     sudo_dir = root / "etc/sudoers.d"

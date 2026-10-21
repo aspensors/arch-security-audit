@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Report malformed account/group records and invalid SSH authentication values as UNKNOWN.
+- Preserve group evidence when passwd cannot be decoded or read.
+
 ## 0.2.0
 
 - Offline comparison of two saved JSON reports using `--compare BEFORE AFTER`.

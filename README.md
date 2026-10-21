@@ -2,7 +2,7 @@
 
 Small security checks for Arch Linux, with evidence and explanations you can inspect.
 
-**Status: early 0.1.0 prototype.** The automated suite uses fixtures; testing on real Arch installations is still needed. [Русское руководство](docs/GUIDE_RU.md).
+**Status: early 0.2.0 prototype.** The automated suite uses fixtures; testing on real Arch installations is still needed. [Русское руководство](docs/GUIDE_RU.md).
 
 The tool reports what it observed, why it matters, and what to inspect next. It does not compute a security score. Most checks produce inventory or review prompts rather than a pass/fail verdict.
 
@@ -29,6 +29,20 @@ python -m venv .venv
 ```
 
 Installing may download build dependencies. There is no need for sudo or system-wide pip installation. Optional system commands: `nft` from `nftables`, `sshd` from `openssh`, `checkupdates` from `pacman-contrib`. Missing tools result in UNKNOWN. Install only what you need; the audit does not require enabling an SSH server.
+
+## Compare two saved reports
+
+```bash
+python -m arch_security_audit --format json > before.json
+# After reviewing and making your own configuration changes:
+python -m arch_security_audit --format json > after.json
+python -m arch_security_audit --compare before.json after.json
+python -m arch_security_audit --compare before.json after.json --format json
+```
+
+Comparison is offline and also works on non-Linux systems. It shows `added`, `removed`, `status_changed`, `details_changed` and `unchanged` checks, with both observations. Evidence order and metadata (timestamps, versions, summary) are ignored. Changes in explanations count as changes. Only schema-1 reports up to 4 MiB with unique check identifiers are accepted; malformed reports and different demo flags or target distributions are rejected.
+
+Verify that the files came from the same host: the report records a distribution, not a machine identity. An update to the distribution label requires reviewing the files separately. A warning changing to UNKNOWN/SKIP is incomplete coverage, not a fix; INFO is not a pass. An absent check means it was not assessed. No severity ranking or automatic fix claim is inferred. Comparison exits 0 when produced (even if changed), 2 on input errors. It supports `--format` only; audit options such as `--strict` do not apply.
 
 ## Example (fictional)
 
